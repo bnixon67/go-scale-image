@@ -1,17 +1,21 @@
 package main
 
 import (
+	"errors"
 	"image"
 	"io"
-	"math"
 
-	"golang.org/x/image/draw"
+	"github.com/disintegration/imaging"
 )
 
-func ScaleDown(r io.Reader, maxWidth, maxHeight int) (image.Image, string, error) {
-	src, format, err := image.Decode(r)
+func ScaleDown(r io.ReadSeeker, maxWidth, maxHeight int) (image.Image, error) {
+	if maxWidth == 0 && maxHeight == 0 {
+		return nil, errors.New("invalid parameters: maxWidth and maxHeight are both 0")
+	}
+
+	src, err := imaging.Decode(r, imaging.AutoOrientation(true))
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	srcWidth := src.Bounds().Dx()
@@ -19,30 +23,31 @@ func ScaleDown(r io.Reader, maxWidth, maxHeight int) (image.Image, string, error
 
 	// don't resize if source is already smaller
 	if srcWidth <= maxWidth || srcHeight <= maxHeight {
-		return src, format, err
+		return src, err
 	}
 
-	// determine scaling ratio
-	var ratio float64
-	switch {
-	case maxWidth == 0:
-		ratio = float64(maxHeight) / float64(srcHeight)
-	case maxHeight == 0:
-		ratio = float64(maxWidth) / float64(srcWidth)
-	default:
-		ratio = math.Min(
-			float64(maxWidth)/float64(srcWidth),
-			float64(maxHeight)/float64(srcHeight),
-		)
-	}
+	/*
+		// determine scaling ratio
+		var ratio float64
+		switch {
+		case maxWidth == 0:
+			ratio = float64(maxHeight) / float64(srcHeight)
+		case maxHeight == 0:
+			ratio = float64(maxWidth) / float64(srcWidth)
+		default:
+			ratio = math.Min(
+				float64(maxWidth)/float64(srcWidth),
+				float64(maxHeight)/float64(srcHeight),
+			)
+		}
 
-	// scaled down dimension
-	newWidth := int(math.Round(float64(srcWidth) * ratio))
-	newHeight := int(math.Round(float64(srcHeight) * ratio))
+		// scaled down dimension
+		newWidth := int(math.Round(float64(srcWidth) * ratio))
+		newHeight := int(math.Round(float64(srcHeight) * ratio))
+	*/
 
-	// Resize:
-	dst := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
-	draw.CatmullRom.Scale(dst, dst.Rect, src, src.Bounds(), draw.Over, nil)
+	// Resize
+	dst := imaging.Resize(src, maxWidth, maxHeight, imaging.Lanczos)
 
-	return dst, format, err
+	return dst, err
 }

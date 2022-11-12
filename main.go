@@ -3,9 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"image/jpeg"
 	"image/png"
 	"os"
+
+	"github.com/disintegration/imaging"
 )
 
 func main() {
@@ -31,7 +32,7 @@ func main() {
 	}
 	defer input.Close()
 
-	img, format, err := ScaleDown(input, width, height)
+	img, err := ScaleDown(input, width, height)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -44,13 +45,20 @@ func main() {
 	}
 	defer output.Close()
 
-	switch format {
-	case "jpeg":
-		jpeg.Encode(output, img, nil)
-	case "png":
-		png.Encode(output, img)
+	format, err := imaging.FormatFromFilename(outFileName)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
-	fmt.Printf("scaled %s %q to %dx%d\n",
-		format, inFileName, img.Bounds().Dx(), img.Bounds().Dy())
+	switch format {
+	case imaging.JPEG:
+		imaging.Encode(output, img, imaging.JPEG, imaging.JPEGQuality(95))
+
+	case imaging.PNG:
+		imaging.Encode(output, img, imaging.PNG, imaging.PNGCompressionLevel(png.DefaultCompression))
+	}
+
+	fmt.Printf("scaled %q to %dx%d\n",
+		inFileName, img.Bounds().Dx(), img.Bounds().Dy())
 }
