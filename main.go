@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"image/png"
 	"os"
 
 	"github.com/disintegration/imaging"
@@ -20,45 +19,48 @@ func main() {
 
 	flag.Parse()
 
-	if (inFileName == "") || (outFileName == "") {
+	if inFileName == "" || outFileName == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	input, err := os.Open(inFileName)
+	err := ScaleImage(inFileName, outFileName, width, height)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("scaled %q to %dx%d\n", inFileName, width, height)
+}
+
+// ScaleImage resizes the image specified by inFileName and saves it to outFileName with the provided width and height.
+func ScaleImage(inFileName, outFileName string, width, height int) error {
+	input, err := os.Open(inFileName)
+	if err != nil {
+		return err
+	}
 	defer input.Close()
 
-	img, err := ScaleDown(input, width, height)
+	img, err := imaging.Decode(input)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
+	}
+
+	// Scale the image if width or height is provided
+	if width > 0 || height > 0 {
+		img = imaging.Resize(img, width, height, imaging.Lanczos)
 	}
 
 	output, err := os.Create(outFileName)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	defer output.Close()
 
-	format, err := imaging.FormatFromFilename(outFileName)
+	err = imaging.Encode(output, img, imaging.PNG)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
-	switch format {
-	case imaging.JPEG:
-		imaging.Encode(output, img, imaging.JPEG, imaging.JPEGQuality(95))
-
-	case imaging.PNG:
-		imaging.Encode(output, img, imaging.PNG, imaging.PNGCompressionLevel(png.DefaultCompression))
-	}
-
-	fmt.Printf("scaled %q to %dx%d\n",
-		inFileName, img.Bounds().Dx(), img.Bounds().Dy())
+	return nil
 }
